@@ -1,1 +1,50 @@
 
+name: Build Mac App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Download Animatek NME 0.19.0
+        uses: actions/checkout@v4
+        with:
+          repository: animatek/Animatek-NME
+          ref: v0.19.0
+          submodules: recursive
+
+      - name: Select Xcode
+        run: |
+          echo "DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13 \
+            -DNME_BUILD_PLUGIN=OFF
+
+      - name: Build
+        run: |
+          cmake --build build --config Release \
+            --target AnimatekNME --parallel 4
+
+      - name: Package Mac app
+        run: |
+          codesign --force --sign - \
+            build/AnimatekNME_artefacts/Release/AnimatekNME.app
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/AnimatekNME_artefacts/Release/AnimatekNME.app \
+            AnimatekNME-v0.19.0-Mac.zip
+
+      - name: Upload Mac app
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimatekNME-v0.19.0-Mac
+          path: AnimatekNME-v0.19.0-Mac.zip
+
